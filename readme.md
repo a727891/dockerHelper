@@ -1,6 +1,8 @@
 #Docker Helper
 Interactive CLI Tool to perform common docker actions.
 
+Run binaries from the docker-compose folder.
+
 Supports menu selection for:
 * docker
   * ps
@@ -14,4 +16,4 @@ Supports menu selection for:
   * start / stop
 
 
-  ###Built using [https://github.com/SBoudrias/Inquirer.js/](InquirerJS) and [https://github.com/zeit/pkg](Pkg)
+  ###Built using [InquirerJS](https://github.com/SBoudrias/Inquirer.js/) and [Pkg](https://github.com/zeit/pkg)
