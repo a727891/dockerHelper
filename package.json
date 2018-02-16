@@ -2,6 +2,7 @@
   "name": "dockerhelper",
   "version": "1.0.0",
   "description": "CLI tool for interacting with docker",
+  "url":"https://github.com/a727891/dockerHelper",
   "main": "src/dockerHelper.ts",
   "scripts": {
     "start": "ts-node src/index.ts",
