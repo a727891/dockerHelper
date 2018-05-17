@@ -1,8 +1,11 @@
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 const yaml = require('node-yaml');
 const IGNORE_SDTOUT = true;
 const RETURN_AS_ARRAY = true;
+
+import { iCustomCommand } from './dockerHelper'
+
 /**
  * Important Docker Commands
  * docker ps
@@ -40,7 +43,11 @@ export class DockerCommands {
     }
 
     public async dockerStatus(): Promise<any> {
-        return await this.asyncSpawn('docker', ['ps']);
+        const ps = await this.asyncSpawn('docker', ['ps']);
+        if (ps !== null && ps.indexOf('error during connect:') >= 0) {
+            return null;
+        };
+        return ps;
     };
 
     public async getComposeServices(): Promise<string[]> {
@@ -55,7 +62,7 @@ export class DockerCommands {
         }
         return await this.asyncSpawn('docker-compose', params);
     }
-    
+
     public async dockerComposeBuild(): Promise<any> {
         return await this.asyncSpawn('docker-compose', ['build']);
     }
@@ -71,9 +78,25 @@ export class DockerCommands {
     public async dockerComposeStop(serviceName): Promise<any> {
         return await this.asyncSpawn('docker-compose', ['stop', serviceName])
     }
+    public async dockerComposeBuildService(serviceName): Promise<any> {
+        return await this.asyncSpawn('docker-compose', ['build', serviceName]);
+    }
 
     public async dockerComposeDown(): Promise<any> {
         return await this.asyncSpawn('docker-compose', ['down']);
+    }
+
+    public dockerComposeLogs(service?: string): any {
+        return new Promise((resolve, reject) => {
+            let params = ['logs', '--tail', '200'];
+            if (!!service) {
+                params.push(service);
+            }
+            const cmd = spawn('docker-compose', params, { cwd: this.workdir, stdio: 'inherit' });
+            cmd.on('close', (code) => {
+                resolve();
+            });
+        });
     }
 
     public async getContainerNameIdMap() {
@@ -103,6 +126,26 @@ export class DockerCommands {
                 resolve();
             });
         });
+    }
+
+    public async customCommand(command: iCustomCommand) {
+        if (command.name === 'AWS Login') {
+            return await this.awsLogin();
+        }
+        return await this.asyncSpawn(command.cmd, command.params);
+    }
+
+    private async awsLogin() {
+        const loginString = await this.asyncSpawn('aws', ['ecr', 'get-login', '--no-include-email', '--region', 'us-east-1'], IGNORE_SDTOUT);
+        const matches = loginString.match(/docker login -u AWS -p (.+) https\:\/\/(\d+)\.dkr\.ecr\.us\-east\-1\.amazonaws\.com/)
+        if (matches) {
+            return new Promise((resolve, reject) => {
+                const cmd = spawn('docker', ['login', '-u', 'AWS', '-p', matches[1], `https://${matches[2]}.dkr.ecr.us-east-1.amazonaws.com`], { cwd: this.workdir, stdio: 'inherit' });
+                cmd.on('close', code => resolve());
+            });
+        }
+        console.log("Unknown failure when logging into AWS");
+        return false;
     }
 
 }

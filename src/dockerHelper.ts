@@ -1,9 +1,17 @@
 import * as inquirer from 'inquirer';
 import { DockerCommands } from './dockerCommands';
 import * as fs from 'fs';
+const packagejson = require('../package.json');
 const chalk = require('chalk');
 
 const PROJECT_NAME = 'gcoplatform';
+
+export interface iCustomCommand {
+  name: string;
+  cmd: string;
+  params: string[]
+}
+
 
 class dockerHelper {
 
@@ -16,9 +24,12 @@ class dockerHelper {
   private dockerCommands: DockerCommands;
   private composePresent = false;
   private dockerfilePresent = false;
+  private customfilePresent = false;
+  private customCommands: iCustomCommand[] = [];
 
   constructor(workDirPath) {
     this.detectDockerFiles(workDirPath);
+    this.detectCustomFile(workDirPath);
     this.dockerCommands = new DockerCommands(workDirPath);
     this.startUp();
   }
@@ -34,9 +45,19 @@ class dockerHelper {
     }
 
   }
+  detectCustomFile(path) {
+    if (fs.existsSync(`${path}/dockerHelper.json`)) {
+      this.customCommands = JSON.parse(fs.readFileSync(`${path}/dockerHelper.json`, 'utf-8'));
+      this.customfilePresent = true;
+    }
+  }
 
   async startUp() {
-    await this.dockerCommands.dockerStatus();
+    const status = await this.dockerCommands.dockerStatus();
+    if (status === null) {
+      console.log("\n!!! DOCKER DAEMON IS NOT AVAILABLE !!!\n");
+      process.exit(0);
+    }
     this.mainMenu();
   }
 
@@ -55,8 +76,15 @@ class dockerHelper {
       name: 'Docker-Compose (Build and Run entire project)',
       value: 'DOCKER_COMPOSE_MENU',
       short: 'Compose',
-      disabled: (this.composePresent ? false : 'No docker-compose.yml detected')
+      disabled: (this.composePresent ? false : chalk.yellow('No docker-compose.yml detected'))
     }
+    const CUSTOM_MENU_BTN = {
+      name: 'Custom Commands',
+      value: 'CUSTOM_MENU',
+      short: 'Custom',
+      disabled: (this.customfilePresent ? false : chalk.yellow('No dockerHelper.json detected'))
+    }
+
     const DOCKER_FILE_BTN = {
       name: 'Dockerfile commands',
       value: 'DOCKER_FILE_MENU',
@@ -67,10 +95,11 @@ class dockerHelper {
     const MAIN_MENU = {
       type: 'list',
       name: 'menu',
-      message: '--- Docker Helper ---',
+      message: `--- Docker Helper (v${packagejson.version})---`,
       choices: [
         DOCKER_MENU_BTN,
         DOCKER_COMPOSE_MENU_BTN,
+        CUSTOM_MENU_BTN,
         // DOCKER_FILE_BTN,
         new inquirer.Separator(),
         QUIT_BTN
@@ -87,7 +116,37 @@ class dockerHelper {
       case DOCKER_COMPOSE_MENU_BTN.value:
         await this.dockerCommands.dockerComposePs();
         return this.dockerComposeMenu();
+      case CUSTOM_MENU_BTN.value:
+        return this.customMenu();
     }
+  }
+
+  async customMenu(): Promise<any> {
+
+    const CUSTOM_MENU = {
+      type: 'list',
+      name: 'answer',
+      message: 'Custom Command Menu',
+      choices: [
+        ...(this.customCommands.map((elem, index): inquirer.objects.ChoiceOption => {
+          return {
+            name: `${elem.name}`,
+            value: index.toString()
+          }
+        })),
+        new inquirer.Separator(),
+        this.BACK_BTN
+      ]
+    };
+    const { answer } = await inquirer.prompt(CUSTOM_MENU);
+    switch (answer) {
+      case this.BACK_BTN.value:
+        return this.mainMenu();
+      default:
+        await this.dockerCommands.customCommand(this.customCommands[parseInt(answer)]);
+        return this.customMenu();
+    }
+
   }
 
   async dockerMenu(): Promise<any> {
@@ -161,7 +220,7 @@ class dockerHelper {
         return this.containerMenu(container)
       default:
         console.log(`Unknown selection!!`);
-        this.mainMenu();
+        return this.mainMenu();
     }
   }
 
@@ -173,7 +232,7 @@ class dockerHelper {
       short: '`docker-compose ps`'
     }
     const DC_BUILD_BTN = {
-      name: 'Build `docker-compose build`',
+      name: 'Build All Services `docker-compose build`',
       value: 'BUILD',
       short: '`docker-compose build`'
     }
@@ -187,6 +246,13 @@ class dockerHelper {
       value: 'DOWN',
       short: '`docker-compose down`'
     }
+
+    const DC_Logs_BTN = {
+      name: `Logs \`docker-compose logs\``,
+      value: 'Logs',
+      short: '`docker-compose logs`'
+    }
+
     const DOCKER_COMPOSE_MENU: inquirer.Question = {
       type: 'list',
       name: 'serviceName',
@@ -195,6 +261,7 @@ class dockerHelper {
       pageSize: 5,
       choices: [
         DC_PS_BTN,
+        DC_Logs_BTN,
         DC_UP_BTN,
         DC_DOWN_BTN,
         DC_BUILD_BTN,
@@ -209,6 +276,9 @@ class dockerHelper {
     switch (serviceName) {
       case this.BACK_BTN.value:
         return this.mainMenu();
+      case DC_Logs_BTN.value:
+        await this.dockerCommands.dockerComposeLogs();
+        return this.dockerComposeMenu();
       case DC_BUILD_BTN.value:
         await this.dockerCommands.dockerComposeBuild();
         return this.dockerComposeMenu();
@@ -242,6 +312,18 @@ class dockerHelper {
       value: 'STOP',
       short: '`docker-compose stop ...`'
     }
+    const DC_BUILD_BTN = {
+      name: `${chalk.yellow('Build')} ${chalk.underline(serviceName)} \`docker-compose build ${serviceName}\``,
+      value: 'Build',
+      short: '`docker-compose build ...`'
+    }
+
+    const DC_Logs_BTN = {
+      name: `'Logs' \`docker-compose logs -f ${serviceName}\``,
+      value: 'Logs',
+      short: `\`docker-compose logs ${serviceName}\``
+    }
+
     const DOCKER_COMPOSE_MENU: inquirer.Question = {
       type: 'list',
       name: 'menu',
@@ -250,8 +332,10 @@ class dockerHelper {
       pageSize: 5,
       choices: [
         DC_PS_BTN,
+        DC_Logs_BTN,
         DC_START_BTN,
         DC_STOP_BTN,
+        DC_BUILD_BTN,
         new inquirer.Separator(),
         this.BACK_BTN
       ]
@@ -260,6 +344,9 @@ class dockerHelper {
     switch (menu) {
       case this.BACK_BTN.value:
         return this.dockerComposeMenu();
+      case DC_Logs_BTN.value:
+        await this.dockerCommands.dockerComposeLogs(serviceName);
+        return this.dockerComposeServiceMenu(serviceName);
       case DC_PS_BTN.value:
         await this.dockerCommands.dockerComposePs(serviceName);
         return this.dockerComposeServiceMenu(serviceName);
@@ -268,6 +355,9 @@ class dockerHelper {
         return this.dockerComposeServiceMenu(serviceName);
       case DC_STOP_BTN.value:
         await this.dockerCommands.dockerComposeStop(serviceName);
+        return this.dockerComposeServiceMenu(serviceName);
+      case DC_BUILD_BTN.value:
+        await this.dockerCommands.dockerComposeBuildService(serviceName);
         return this.dockerComposeServiceMenu(serviceName);
       default:
         console.log('Unknown selection!!');
