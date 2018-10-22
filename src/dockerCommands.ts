@@ -136,15 +136,15 @@ export class DockerCommands {
     }
 
     private async awsLogin() {
-        const loginString = await this.asyncSpawn('aws', ['ecr', 'get-login', '--no-include-email', '--region', 'us-east-1'], IGNORE_SDTOUT);
-        const matches = loginString.match(/docker login -u AWS -p (.+) https\:\/\/(\d+)\.dkr\.ecr\.us\-east\-1\.amazonaws\.com/)
-        if (matches) {
+        const loginString = await this.asyncSpawn('aws', ['ecr', 'get-authorization-token'], IGNORE_SDTOUT);
+        const json = JSON.parse(loginString);
+        if(json.authorizationData && json.authorizationData.authorizationToken && json.authorizationData.proxyEndpoint){
             return new Promise((resolve, reject) => {
-                const cmd = spawn('docker', ['login', '-u', 'AWS', '-p', matches[1], `https://${matches[2]}.dkr.ecr.us-east-1.amazonaws.com`], { cwd: this.workdir, stdio: 'inherit' });
+                const cmd = spawn('docker', ['login', '-u', 'AWS', '-p', json.authorizationData.authorizationToken, json.authorizationData.proxyEndpoint], { cwd: this.workdir, stdio: 'inherit' });
                 cmd.on('close', code => resolve());
             });
         }
-        console.log("Unknown failure when logging into AWS");
+        console.log(`Unknown failure when logging into AWS ${loginString}`);
         return false;
     }
 

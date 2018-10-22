@@ -1,6 +1,6 @@
 {
   "name": "dockerhelper",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "CLI tool for interacting with docker",
   "url": "https://github.com/a727891/dockerHelper",
   "main": "src/dockerHelper.ts",
