@@ -58,7 +58,9 @@ class dockerHelper {
       console.log("\n!!! DOCKER DAEMON IS NOT AVAILABLE !!!\n");
       process.exit(0);
     }
-    this.mainMenu();
+    this.mainMenu().catch(errors=>{
+      console.log(errors);
+    });
   }
 
   async mainMenu() {

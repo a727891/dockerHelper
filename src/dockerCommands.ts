@@ -6,6 +6,8 @@ const RETURN_AS_ARRAY = true;
 
 import { iCustomCommand } from './dockerHelper'
 
+const { base64decode } = require('nodejs-base64');
+
 /**
  * Important Docker Commands
  * docker ps
@@ -138,10 +140,15 @@ export class DockerCommands {
     private async awsLogin() {
         const loginString = await this.asyncSpawn('aws', ['ecr', 'get-authorization-token'], IGNORE_SDTOUT);
         const json = JSON.parse(loginString);
-        if(json.authorizationData && json.authorizationData.authorizationToken && json.authorizationData.proxyEndpoint){
+        if(json.authorizationData && json.authorizationData.length && json.authorizationData[0].authorizationToken && json.authorizationData[0].proxyEndpoint){
             return new Promise((resolve, reject) => {
-                const cmd = spawn('docker', ['login', '-u', 'AWS', '-p', json.authorizationData.authorizationToken, json.authorizationData.proxyEndpoint], { cwd: this.workdir, stdio: 'inherit' });
+                let endpoint = json.authorizationData[0].proxyEndpoint
+                let userpass = base64decode(json.authorizationData[0].authorizationToken).split(':');
+                let user = userpass[0];
+                let token= userpass[1]
+                const cmd = spawn('docker', ['login', '-u', user, '-p', token, endpoint], { cwd: this.workdir, stdio: 'inherit' });
                 cmd.on('close', code => resolve());
+                cmd.on('error', code => reject(`Docker Login failed with ${code}`))
             });
         }
         console.log(`Unknown failure when logging into AWS ${loginString}`);

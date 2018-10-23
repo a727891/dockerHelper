@@ -1,12 +1,12 @@
 {
   "name": "dockerhelper",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "CLI tool for interacting with docker",
   "url": "https://github.com/a727891/dockerHelper",
   "main": "src/dockerHelper.ts",
   "scripts": {
     "start": "ts-node src/dockerHelper.ts",
-    "package": "tsc && pkg ./dist/dockerHelper.js --out-path=release --targets=node6-linux-x64,node6-linux-x86,node6-win-x64,node6-win-x86"
+    "package": "tsc && pkg ./dist/dockerHelper.js --out-path=release --targets=node8-linux-x64,node8-win-x64"
   },
   "author": "chris.funk@forgelabs.us",
   "license": "ISC",
@@ -17,8 +17,9 @@
     "child_process": "^1.0.2",
     "inquirer": "^5.1.0",
     "node-yaml": "^3.1.1",
+    "nodejs-base64": "^1.0.3",
     "nodemon": "1.11.0",
-    "pkg": "^4.3.0",
+    "pkg": "^4.3.4",
     "ts-node": "^4.1.0"
   },
   "devDependencies": {
